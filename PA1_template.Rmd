@@ -1,4 +1,6 @@
+
 ---
+
 title: "Reproducible Research: Peer Assessment 1"
 output: 
   html_document:
@@ -8,18 +10,133 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r}
+library(lubridate)
+library(ggplot2)
+if(!file.exists("activity.csv")) unzip("activity.zip")
+activity <- read.csv("activity.csv",header=TRUE)
+total.steps.date <- tapply(activity$steps, activity$date, FUN = sum, na.rm = TRUE)
+total.steps.interval <- tapply(activity$steps, activity$interval, FUN = sum, na.rm = TRUE)
+activity$date <- ymd(activity$date)
+uad <- unique(activity$date)
+str(activity)
+summary(activity)
+```
 
 
 ## What is mean total number of steps taken per day?
 
-
+The following is the mean total number of steps taken per day:
+```{r}
+mean(total.steps.date)
+```
+The following is the median total number of steps taken per day:
+```{r}
+median(total.steps.date)
+```
+% Getting ready for gglplot2
+```{r,echo=FALSE}
+steps <- data.frame(total.steps.date,uad)
+```
+This is the histogram of the total number of steps taken each day:
+```{r}
+p1 <- ggplot(steps,aes(x=uad,y=total.steps.date))
+ p1 <- p1 + geom_histogram(stat="identity") + xlab("Dates")+ ylab("Steps")+ labs(title= "Total numbers of Steps per day")
+p1
+```
 
 ## What is the average daily activity pattern?
 
+Time series plot of the average number of steps taken per 5-minute interval, averaged across all days
+```{r}
+mean.steps.interval <- tapply(activity$steps, activity$interval, FUN = mean, na.rm = TRUE)
+plot(unique(activity$interval),mean.steps.interval, type='l',xlab="5-minute interval",ylab="Average number of steps across all days per interval")
+```
 
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r}
+activity[which.max(mean.steps.interval),]$interval
+```
 
 ## Imputing missing values
 
+The total number of missing vaules in the dataset:
+```{r}
+sum(!complete.cases(activity))
+```
 
+I am imputing the missing values by replacing all NAs with the mean of the number of steps for that interval
+```{r}
+uat <- unique(activity$interval)
+act <- activity$interval
+ast <- activity$steps
+nstp = 0;
+for (i in 1:length(ast)) {
+  if (is.na(ast[i])) {
+    nvec <- act[i]
+svec <- which(uat == nvec)
+    nstp[i] <- mean.steps.interval[svec]
+    }
+else {
+  nstp[i] = ast[i]
+  }
+}
+```
+New data set "new activity":
+```{r}
+a_d <- activity$date
+a_t <- activity$interval
+newactivity <- data.frame(nstp,a_d,a_t)
+names(newactivity) <- c("steps","date","interval")
+new.total.steps.date <- tapply(newactivity$steps, newactivity$date, FUN = sum, na.rm = TRUE)
+newactivity$date <- ymd(newactivity$date)
+nuad <- unique(newactivity$date)
+
+newsteps <- data.frame(new.total.steps.date,nuad)
+
+p2 <- ggplot(newsteps,aes(x=nuad,y=new.total.steps.date))
+ p2 <- p2 + geom_histogram(stat="identity") + xlab("Dates")+ ylab("Steps")+ labs(title= "Imputed total numbers of Steps per day")
+p2
+
+```
+
+Comparison of pre- and post-imputed mean and median values of the total steps taken per day.
+There are differences in the mean and median values for both sets.
+
+Pre-
+```{r}
+mean(total.steps.date)
+median(total.steps.date)
+```
+
+Post-
+```{r}
+mean(new.total.steps.date)
+median(new.total.steps.date)
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+New factor for weekday or weekend
+```{r}
+dayofweek <- function(date) {
+    if (weekdays(as.Date(date)) %in% c("Saturday", "Sunday")) {
+        "weekend"
+    } else {
+        "weekday"
+    }
+}
+newactivity$daytype <- as.factor(sapply(newactivity$date, dayofweek))
+Twknd <- subset(newactivity,daytype=="weekend")
+Twkday <- subset(newactivity,daytype=="weekday")
+```
+Calculating the average steps per interval across weekdays and weekends
+```{r}
+mean.steps.interval.weekday <- tapply(Twkday$steps, Twkday$interval, FUN = mean, na.rm = TRUE)
+mean.steps.interval.weekend <- tapply(Twknd$steps, Twknd$interval, FUN = mean, na.rm = TRUE)
+
+plot(uat,mean.steps.interval.weekday, type='l',xlab="5-minute interval",ylab="Average number of steps across all days per interval",col="blue")
+ lines(uat,mean.steps.interval.weekend,col="red")
+legend("topright",c("weekday","weekend"),col=c("blue","red"),lty=1)     
+```
